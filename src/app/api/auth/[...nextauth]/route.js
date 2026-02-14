@@ -1,70 +1,39 @@
-import NextAuth from "next-auth"
-import CredentialsProvider from "next-auth/providers/credentials"
+import NextAuth from "next-auth";
+import GithubProvider from "next-auth/providers/github"; 
+import GoogleProvider from "next-auth/providers/google"; 
+import { PrismaAdapter } from "@auth/prisma-adapter"; 
+import prisma from "@/app/libs/prisma"; 
+
+const useDatabase = !!prisma;
 
 export const authOptions = {
-  // WAJIB di production
-  secret: process.env.NEXTAUTH_SECRET,
-
-  session: {
-    strategy: "jwt",
-  },
+  adapter: useDatabase ? PrismaAdapter(prisma) : undefined,
 
   providers: [
-    CredentialsProvider({
-      name: "Credentials",
-      credentials: {
-        email: {
-          label: "Email",
-          type: "email",
-          placeholder: "admin@example.com",
-        },
-        password: {
-          label: "Password",
-          type: "password",
-        },
-      },
-
-      async authorize(credentials) {
-        // ⚠️ CONTOH LOGIN SEDERHANA
-        // GANTI dengan database jika perlu
-
-        if (
-          credentials.email === "admin@example.com" &&
-          credentials.password === "123456"
-        ) {
-          return {
-            id: "1",
-            name: "Admin",
-            email: "admin@example.com",
-          }
-        }
-
-        // Login gagal
-        return null
-      },
+    GithubProvider({
+      clientId: process.env.GITHUB_CLIENT_ID,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET,
+    }),
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     }),
   ],
 
   pages: {
-    signIn: "/login", // optional
+    signIn: "/signin",
   },
 
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id
-      }
-      return token
-    },
+  secret: process.env.NEXT_AUTH_SECRET,
 
-    async session({ session, token }) {
-      if (token) {
-        session.user.id = token.id
-      }
-      return session
-    },
+  session: {
+    strategy: useDatabase ? "database" : "jwt",
+    maxAge: 30 * 24 * 60 * 60, 
   },
-}
 
-const handler = NextAuth(authOptions)
-export { handler as GET, handler as POST }
+  debug: process.env.NODE_ENV === "development",
+};
+
+const handler = NextAuth(authOptions);
+
+export { handler as GET, handler as POST };
