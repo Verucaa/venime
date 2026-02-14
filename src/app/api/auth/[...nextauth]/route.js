@@ -1,51 +1,70 @@
-import NextAuth from "next-auth";
-import GithubProvider from "next-auth/providers/github"; 
-import GoogleProvider from "next-auth/providers/google"; 
-import { PrismaAdapter } from "@auth/prisma-adapter"; 
-import prisma from "@/app/libs/prisma"; 
-
 import NextAuth from "next-auth"
+import CredentialsProvider from "next-auth/providers/credentials"
 
 export const authOptions = {
+  // WAJIB di production
   secret: process.env.NEXTAUTH_SECRET,
-  providers: [
-    // provider kamu
-  ],
-}
 
-const handler = NextAuth(authOptions)
-export { handler as GET, handler as POST }
-
-const useDatabase = !!prisma;
-
-export const authOptions = {
-  adapter: useDatabase ? PrismaAdapter(prisma) : undefined,
+  session: {
+    strategy: "jwt",
+  },
 
   providers: [
-    GithubProvider({
-      clientId: process.env.GITHUB_CLIENT_ID,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET,
-    }),
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    CredentialsProvider({
+      name: "Credentials",
+      credentials: {
+        email: {
+          label: "Email",
+          type: "email",
+          placeholder: "admin@example.com",
+        },
+        password: {
+          label: "Password",
+          type: "password",
+        },
+      },
+
+      async authorize(credentials) {
+        // ⚠️ CONTOH LOGIN SEDERHANA
+        // GANTI dengan database jika perlu
+
+        if (
+          credentials.email === "admin@example.com" &&
+          credentials.password === "123456"
+        ) {
+          return {
+            id: "1",
+            name: "Admin",
+            email: "admin@example.com",
+          }
+        }
+
+        // Login gagal
+        return null
+      },
     }),
   ],
 
   pages: {
-    signIn: "/signin",
+    signIn: "/login", // optional
   },
 
-  secret: process.env.NEXT_AUTH_SECRET,
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id
+      }
+      return token
+    },
 
-  session: {
-    strategy: useDatabase ? "database" : "jwt",
-    maxAge: 30 * 24 * 60 * 60, 
+    async session({ session, token }) {
+      if (token) {
+        session.user.id = token.id
+      }
+      return session
+    },
   },
+}
 
-  debug: process.env.NODE_ENV === "development",
-};
-
-const handler = NextAuth(authOptions);
-
-export { handler as GET, handler as POST };
+const handler = NextAuth(authOptions)
+export { handler as GET, handler as POST }
